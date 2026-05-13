@@ -2,7 +2,7 @@
 role: dev
 displayName: Developer
 reportsTo: po
-tools: read, write, edit, bash, grep, find, ls
+tools: read, write, edit, bash, grep, find, ls, web_fetch
 maxTurns: 0
 ---
 

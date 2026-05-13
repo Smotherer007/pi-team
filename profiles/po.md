@@ -2,7 +2,7 @@
 role: po
 displayName: Product Owner
 reportsTo: null
-tools: read, grep, find, ls
+tools: read, grep, find, ls, web_fetch
 maxTurns: 0
 ---
 

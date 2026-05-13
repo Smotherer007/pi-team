@@ -2,7 +2,7 @@
 role: architect
 displayName: Software Architect
 reportsTo: po
-tools: read, grep, find, ls, bash
+tools: read, grep, find, ls, bash, web_fetch
 maxTurns: 0
 ---
 
