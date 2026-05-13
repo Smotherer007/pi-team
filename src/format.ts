@@ -4,7 +4,7 @@
  * Pure formatting functions. No side effects, no I/O.
  */
 
-import type { UsageStats } from "./types";
+import type { AgentProgress, UsageStats } from "./types";
 
 // ─── Token Formatting ───────────────────────────────────────────────────────
 
@@ -93,4 +93,40 @@ export function truncateLines(text: string, maxLines: number): string {
   const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(0, maxLines).join("\n") + "\n...";
+}
+
+// ─── Progress Formatting ───────────────────────────────────────────────────
+
+/** Format live agent progress for /team-status display (pi-subagents style). */
+export function formatProgress(progress: AgentProgress): string {
+  const parts: string[] = [];
+
+  // Current tool
+  if (progress.currentTool) {
+    let toolStr = progress.currentTool;
+    if (progress.currentPath) {
+      toolStr += ` ${truncate(progress.currentPath, 30)}`;
+    }
+    parts.push(toolStr);
+  }
+
+  // Turn count
+  if (progress.turnCount > 0) {
+    parts.push(`t${progress.turnCount}`);
+  }
+
+  // Tokens
+  if (progress.tokens > 0) {
+    parts.push(formatTokens(progress.tokens));
+  }
+
+  // Last activity
+  if (progress.lastActivityAt) {
+    const idleSec = Math.floor((Date.now() - progress.lastActivityAt) / 1000);
+    if (idleSec > 5 && !progress.currentTool) {
+      parts.push(`idle:${idleSec}s`);
+    }
+  }
+
+  return parts.join(" ");
 }

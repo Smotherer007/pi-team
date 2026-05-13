@@ -1,4 +1,4 @@
-# pi-team — Team Agent Orchestration for pi
+# pi-team - Team Agent Orchestration for pi
 
 A pi extension that orchestrates a **team of AI agents** with role-based profiles, shared memory, sprint phases, and structured handoffs between agents.
 
@@ -6,18 +6,18 @@ A pi extension that orchestrates a **team of AI agents** with role-based profile
 
 ```
 PO (Product Owner)
-  ├── UX Designer          — Interaction flow, language, layout
-  ├── Software Architect   — System design, API contracts, technology choices
-  └── Developer            — Implementation, tests, commit + push
-        ├── CI Engineer       — Pipeline, build, test verification
-        ├── Security Reviewer — Vulnerability audit, data safety
-        └── Quality Manager   — Holistic quality score 1-10
+  ├── UX Designer          - Interaction flow, language, layout
+  ├── Software Architect   - System design, API contracts, technology choices
+  └── Developer            - Implementation, tests, commit + push
+        ├── CI Engineer       - Pipeline, build, test verification
+        ├── Security Reviewer - Vulnerability audit, data safety
+        └── Quality Manager   - Holistic quality score 1-10
 ```
 
 - **7 profiles** defined as Markdown files with YAML frontmatter
 - **sprint.json** defines 8 ordered phases (requirements → design → architecture → implementation → ci → security → quality → review)
 - **Shared memory** (`.pi/team/team-memory.md`) carries context between agents
-- **Background execution** — teams run non-blocking, results injected as follow-up
+- **Background execution** - teams run non-blocking, results injected as follow-up
 - **`/team-start`**, **`/team-status`**, **`/team-result`** commands
 - **3 workflow prompts**: `/sprint`, `/pr`, `/analyze`
 
@@ -73,7 +73,7 @@ Fix timeout bugs in the IMAP client...
 
 ### Example Task
 
-See [`tasks/portalgun.md`](tasks/portalgun.md) for a complete example — a Portal Gun mutator for Unreal Tournament 99. Start it with:
+See [`tasks/portalgun.md`](tasks/portalgun.md) for a complete example - a Portal Gun mutator for Unreal Tournament 99. Start it with:
 
 ```
 /team-start tasks/portalgun.md
@@ -87,16 +87,16 @@ Written to `.pi/team/team-memory.md`. Each agent reads all previous sections and
 
 ```
 src/
-├── types.ts          — All data types (readonly, no classes)
-├── discovery.ts      — Profile loading from .md files
-├── instructions.ts   — Sprint phase loader (reads sprint.json)
-├── planner.ts        — buildExecutionPlan (topological sort by reportsTo)
-├── memory.ts         — Shared memory CRUD operations
-├── runner.ts         — Agent subprocess (spawn + stream + timeout)
-├── orchestrator.ts   — executeTeam pipeline
-├── format.ts         — Token/usage formatting utilities
-├── renderer.ts       — TUI collapsed/expanded views
-└── index.ts          — Extension entry, tool registration, commands
+├── types.ts          - All data types (readonly, no classes)
+├── discovery.ts      - Profile loading from .md files
+├── instructions.ts   - Sprint phase loader (reads sprint.json)
+├── planner.ts        - buildExecutionPlan (topological sort by reportsTo)
+├── memory.ts         - Shared memory CRUD operations
+├── runner.ts         - Agent subprocess (spawn + stream + timeout)
+├── orchestrator.ts   - executeTeam pipeline
+├── format.ts         - Token/usage formatting utilities
+├── renderer.ts       - TUI collapsed/expanded views
+└── index.ts          - Extension entry, tool registration, commands
 ```
 
 ### Principles

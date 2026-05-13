@@ -9,7 +9,7 @@
  */
 
 import { buildTaskInstructions, getSprint } from "./instructions";
-import type { AgentResult, ProfileConfig, Task, TeamDetails } from "./types";
+import type { AgentProgress, AgentResult, ProfileConfig, Task, TeamDetails } from "./types";
 import { buildDoDFromPlan, buildExecutionPlan } from "./planner";
 import {
   appendMemorySection,
@@ -45,6 +45,7 @@ export async function executeTeam(
   modelOverride?: string,
   signal?: AbortSignal,
   teamReview?: boolean,
+  onProgress?: (role: string, progress: AgentProgress) => void,
 ): Promise<{
   results: readonly AgentResult[];
   memoryPath: string | null;
@@ -98,7 +99,14 @@ export async function executeTeam(
       : "execute";
     const agentTask = buildAgentTask(task.description, profile, phaseId);
 
-    const result = await runAgent(profile, agentTask, memoryContent, cwd, signal);
+    const result = await runAgent(
+      profile,
+      agentTask,
+      memoryContent,
+      cwd,
+      signal,
+      (progress) => onProgress?.(task.assignedRole, progress),
+    );
 
     if (result.finalOutput) {
       appendMemorySection(cwd, profile.role, profile.displayName, result.finalOutput);
@@ -131,6 +139,7 @@ export async function executeTeam(
         memoryContent,
         cwd,
         signal,
+        (progress) => onProgress?.(rootProfile.role, progress),
       );
 
       // Mark as review result

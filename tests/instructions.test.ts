@@ -1,5 +1,5 @@
 /**
- * Tests for instructions.ts — sprint phase loading and task instruction building
+ * Tests for instructions.ts - sprint phase loading and task instruction building
  */
 
 import { describe, expect, it } from "vitest";

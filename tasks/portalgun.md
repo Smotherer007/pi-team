@@ -8,11 +8,11 @@ model: deepseek-v4-pro
 teamReview: true
 ---
 
-> 💡 This is the **example task** for pi-team. Use it as a reference for creating your own task files or as a first test run.
+> **Note:** This is the **example task** for pi-team. Use it as a reference for creating your own task files or as a first test run.
 
 # Portal Gun Mutator for Unreal Tournament 99
 
-Develop a **Portal Gun Mutator** for UT99 (UnrealScript, Unreal Engine 1) that gives the player a weapon capable of placing two portals — similar to the concept from Portal/Portal 2, adapted to UT99 mechanics and engine constraints.
+Develop a **Portal Gun Mutator** for UT99 (UnrealScript, Unreal Engine 1) that gives the player a weapon capable of placing two portals - similar to the concept from Portal/Portal 2, adapted to UT99 mechanics and engine constraints.
 
 ## Core Idea
 - A new weapon (replaces e.g. the Redeemer or added as an extra weapon) with two fire modes:
@@ -20,7 +20,7 @@ Develop a **Portal Gun Mutator** for UT99 (UnrealScript, Unreal Engine 1) that g
   - **Secondary Fire**: Places Portal B (e.g. orange)
 - Portals are placed on walls/ceilings/floors where the projectile impacts
 - When a player, bot, or projectile enters one portal, they exit from the other portal (preserving speed and direction relative to the portal surface)
-- Maximum 2 portals at any time — placing a new one of the same type overwrites the old one
+- Maximum 2 portals at any time - placing a new one of the same type overwrites the old one
 - Portals are visually distinct (colored texture/effect)
 
 ## Technical Context
@@ -28,7 +28,7 @@ Develop a **Portal Gun Mutator** for UT99 (UnrealScript, Unreal Engine 1) that g
 - **Platform**: UT99 v436 or v469
 - **Files**: `.u` packages (compiled from `.uc` UnrealScript sources)
 - Portals can be implemented via `WarpZoneInfo` or `Touch` event + `SetLocation`
-- UT99 has no native portal system like later engines — a creative solution is required
+- UT99 has no native portal system like later engines - a creative solution is required
 
 ## Detailed Requirements
 

@@ -14,7 +14,7 @@ import * as path from "node:path";
 import type { Message } from "@earendil-works/pi-ai";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { buildTaskInstructions } from "./instructions";
-import type { AgentResult, ProfileConfig, UsageStats } from "./types";
+import type { AgentProgress, AgentResult, ProfileConfig, UsageStats } from "./types";
 import { MAX_TURNS_HARD_LIMIT, TOTAL_TIMEOUT_BUFFER_SECONDS, TURN_TIMEOUT_SECONDS } from "./types";
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ export async function runAgent(
   sharedMemoryContent: string,
   cwd: string,
   signal?: AbortSignal,
+  onProgress?: (progress: AgentProgress) => void,
 ): Promise<AgentResult> {
   const maxTurns = profile.maxTurns === 0
     ? Infinity
@@ -60,7 +61,7 @@ export async function runAgent(
     const args = buildPiArgs(profile, tmpPromptPath, task);
 
     // Spawn and collect
-    return await spawnAndCollect(profile, task, args, cwd, maxTurns, totalTimeoutMs, signal);
+    return await spawnAndCollect(profile, task, args, cwd, maxTurns, totalTimeoutMs, signal, onProgress);
   } finally {
     // Cleanup temp files
     if (tmpPromptPath) {
@@ -157,22 +158,10 @@ function buildPiArgs(
 }
 
 // ─── Determine Pi Binary ────────────────────────────────────────────────────
+// Simplified: always use "pi" from PATH (consistent with pi-subagents approach).
+// On Linux/macOS pi is always available via PATH when the extension is loaded.
 
 function getPiInvocation(args: string[]): { command: string; args: string[] } {
-  const currentScript = process.argv[1];
-  const isBunVirtualScript = currentScript?.startsWith("/$bunfs/root/");
-
-  if (currentScript && !isBunVirtualScript && fs.existsSync(currentScript)) {
-    return { command: process.execPath, args: [currentScript, ...args] };
-  }
-
-  const execName = path.basename(process.execPath).toLowerCase();
-  const isGenericRuntime = /^(node|bun)(\.exe)?$/.test(execName);
-
-  if (!isGenericRuntime) {
-    return { command: process.execPath, args };
-  }
-
   return { command: "pi", args };
 }
 
@@ -186,6 +175,7 @@ function spawnAndCollect(
   maxTurns: number,
   totalTimeoutMs: number,
   signal?: AbortSignal,
+  onProgress?: (progress: AgentProgress) => void,
 ): Promise<AgentResult> {
   return new Promise((resolve) => {
     const invocation = getPiInvocation(piArgs);
@@ -214,6 +204,33 @@ function spawnAndCollect(
       tokens: 0,
       turns: 0,
     };
+
+    // ── Progress Tracking ───────────────────────────────────────────────
+
+    const startedAt = Date.now();
+    let currentTool: string | undefined;
+    let currentToolArgs: string | undefined;
+    let currentToolStartedAt: number | undefined;
+    let currentPath: string | undefined;
+    let lastActivityAt: number | undefined;
+    const recentTools: AgentProgress["recentTools"] = [];
+
+    function emitProgress(): void {
+      if (!onProgress) return;
+      onProgress({
+        agent: profile.role,
+        status: "running",
+        currentTool,
+        currentToolArgs,
+        currentToolStartedAt,
+        currentPath,
+        recentTools,
+        turnCount: turns,
+        tokens: usage.input + usage.output,
+        lastActivityAt,
+        startedAt,
+      });
+    }
 
     // ── Timeout ──────────────────────────────────────────────────────────
 
@@ -273,7 +290,39 @@ function spawnAndCollect(
         return;
       }
 
-      // Track turns from message_end events
+      // ── Tool execution tracking ────────────────────────────────────────
+
+      if (event.type === "tool_execution_start") {
+        currentTool = event.toolName;
+        currentToolStartedAt = Date.now();
+        lastActivityAt = currentToolStartedAt;
+
+        // Build short args string and extract path
+        if (event.args) {
+          currentToolArgs = JSON.stringify(event.args).slice(0, 120);
+          currentPath = event.args.path || event.args.file || event.args.filePath || currentPath;
+        }
+        emitProgress();
+        return;
+      }
+
+      if (event.type === "tool_execution_end") {
+        if (currentTool) {
+          recentTools.push({
+            tool: currentTool,
+            args: currentToolArgs || "",
+            endMs: Date.now(),
+          });
+          // Keep only last 10 recent tools
+          if (recentTools.length > 10) recentTools.shift();
+        }
+        currentTool = undefined;
+        currentToolArgs = undefined;
+        currentToolStartedAt = undefined;
+        emitProgress();
+      }
+
+      // ── Message tracking ───────────────────────────────────────────────
       if (event.type === "message_end" && event.message) {
         const msg = event.message as Message;
         messages.push(msg);
@@ -359,6 +408,21 @@ function spawnAndCollect(
 
       const exitCode = code ?? 1;
 
+      const progress: AgentProgress = {
+        agent: profile.role,
+        status: wasAborted ? "failed" : exitCode === 0 ? "completed" : "failed",
+        currentTool,
+        currentToolArgs,
+        currentToolStartedAt,
+        currentPath,
+        recentTools,
+        turnCount: turns,
+        tokens: usage.input + usage.output,
+        lastActivityAt,
+        startedAt,
+        error: wasTimedOut ? "timeout" : turnTimedOut ? "turn_timeout" : undefined,
+      };
+
       if (wasAborted) {
         resolve({
           role: profile.role,
@@ -370,6 +434,7 @@ function spawnAndCollect(
           usage,
           stopReason: "aborted",
           errorMessage: "Agent was aborted",
+          progress,
         });
         return;
       }
@@ -385,6 +450,7 @@ function spawnAndCollect(
           usage,
           stopReason: "timeout",
           errorMessage: `Total timeout of ${totalTimeoutMs}ms exceeded`,
+          progress,
         });
         return;
       }
@@ -400,6 +466,7 @@ function spawnAndCollect(
           usage,
           stopReason: "timeout",
           errorMessage: `Turn timeout of ${TURN_TIMEOUT_SECONDS}s exceeded`,
+          progress,
         });
         return;
       }
@@ -414,6 +481,7 @@ function spawnAndCollect(
         usage,
         stopReason,
         errorMessage,
+        progress,
       });
     });
 
@@ -433,6 +501,15 @@ function spawnAndCollect(
         usage,
         stopReason: "error",
         errorMessage: err.message,
+        progress: {
+          agent: profile.role,
+          status: "failed",
+          turnCount: turns,
+          tokens: usage.input + usage.output,
+          recentTools: [],
+          startedAt,
+          error: err.message,
+        },
       });
     });
 
@@ -474,5 +551,14 @@ function buildAbortedResult(profile: ProfileConfig, task: string): AgentResult {
     },
     stopReason: "aborted",
     errorMessage: "Agent was aborted before execution",
+    progress: {
+      agent: profile.role,
+      status: "failed",
+      turnCount: 0,
+      tokens: 0,
+      recentTools: [],
+      startedAt: Date.now(),
+      error: "aborted",
+    },
   };
 }

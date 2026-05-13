@@ -1,5 +1,5 @@
 /**
- * Tests for format.ts — pure formatting utilities
+ * Tests for format.ts - pure formatting utilities
  */
 
 import { describe, expect, it } from "vitest";

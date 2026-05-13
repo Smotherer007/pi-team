@@ -1,10 +1,10 @@
 ---
-description: Lightweight workflow — Dev implements, Security audits, QA checks, PO reviews
+description: Lightweight workflow - Dev implements, Security audits, QA checks, PO reviews
 ---
 
 # Workflow: PR
 
-**Purpose:** Implement a change quickly with essential quality gates — security audit, quality check, and PO sign-off — without the full overhead of UX review, architecture planning, and CI pipeline checks.
+**Purpose:** Implement a change quickly with essential quality gates - security audit, quality check, and PO sign-off - without the full overhead of UX review, architecture planning, and CI pipeline checks.
 
 **When to use:** Use this workflow for small-to-medium changes where UX impact is minimal and the architecture is already defined (e.g. bug fixes, refactors, internal tooling, additions within an existing pattern). Requires `## PO Analysis` to already be present in shared memory from a prior `/analyze` run. Use `/sprint` for new user-facing features or changes that require a full quality gate.
 
@@ -18,7 +18,7 @@ Run as a team with roles: `["dev", "sr", "qa"]` and `teamReview: true`
 
 ---
 
-### Step 1 — dev (Implementation)
+### Step 1 - dev (Implementation)
 
 **Reads:** `## PO Analysis` (required), `## Architecture` if present
 
@@ -40,7 +40,7 @@ Run as a team with roles: `["dev", "sr", "qa"]` and `teamReview: true`
 
 ---
 
-### Step 2 — sr (Security Reviewer)
+### Step 2 - sr (Security Reviewer)
 
 **Reads:** `## Developer Implementation` (required), inspects changed files directly
 
@@ -48,34 +48,34 @@ Run as a team with roles: `["dev", "sr", "qa"]` and `teamReview: true`
 
 **Produces:** `## Security Audit` in shared memory, containing:
 - Findings by severity (Critical / High / Medium / Low), each with `file:line`, impact description, and concrete fix
-- Release recommendation: `✅ SAFE TO RELEASE` / `⚠️ RELEASE WITH MITIGATIONS` / `❌ DO NOT RELEASE`
+- Release recommendation: `[PASS] SAFE TO RELEASE` / `[WARN] RELEASE WITH MITIGATIONS` / `[FAIL] DO NOT RELEASE`
 
 **Audits:** input validation, data leakage in logs/errors, command injection in shell calls, subprocess safety (timeouts, escaping), new dependencies (npm audit), new attack surface.
 
 ---
 
-### Step 3 — qa (Quality Manager)
+### Step 3 - qa (Quality Manager)
 
 **Reads:** all available shared memory sections, inspects source files directly
 
 **Produces:** `## QA Report` in shared memory, containing:
 - Quality scores (1–10) for: Code / Tests / Docs / Consistency / Overall
 - Top 3 recommendations ordered by impact, each with `file:line` reference
-- Any issues not raised by other agents, marked `🚨 NEW FINDING`
-- Release recommendation: `✅ READY FOR RELEASE` / `⚠️ RELEASE WITH CAUTION` / `❌ NOT READY`
+- Any issues not raised by other agents, marked `[NEW] NEW FINDING`
+- Release recommendation: `[PASS] READY FOR RELEASE` / `[WARN] RELEASE WITH CAUTION` / `[FAIL] NOT READY`
 
 ---
 
-### Final Review — po (teamReview)
+### Final Review - po (teamReview)
 
 **Reads:** all shared memory sections
 
 **Produces:** `## PO Review` in shared memory, containing:
-- Per-AC verdict: `✅ Met` / `❌ Not met` / `⚠️ Partially met` + one-sentence reason
-- Overall status: `✅ ACCEPTED` / `❌ REWORK NEEDED` / `⚠️ CONDITIONAL ACCEPT`
+- Per-AC verdict: `[PASS] Met` / `[FAIL] Not met` / `[WARN] Partially met` + one-sentence reason
+- Overall status: `[PASS] ACCEPTED` / `[FAIL] REWORK NEEDED` / `[WARN] CONDITIONAL ACCEPT`
 - If REWORK NEEDED: specific changes required with AC numbers and file references
 
-**Rule:** If Security returns `❌ DO NOT RELEASE` or QA returns `❌ NOT READY`, the PO must conclude `❌ REWORK NEEDED`.
+**Rule:** If Security returns `[FAIL] DO NOT RELEASE` or QA returns `[FAIL] NOT READY`, the PO must conclude `[FAIL] REWORK NEEDED`.
 
 ---
 
@@ -90,10 +90,10 @@ The Developer additionally commits and pushes code to the repository.
 ## Completion Criteria
 
 The workflow is complete when all of the following are present in shared memory:
-- `## Developer Implementation` — commit hash and AC checklist
-- `## Security Audit` — findings by severity and release recommendation
-- `## QA Report` — quality scores and release recommendation
-- `## PO Review` — per-AC verdict and overall status
+- `## Developer Implementation` - commit hash and AC checklist
+- `## Security Audit` - findings by severity and release recommendation
+- `## QA Report` - quality scores and release recommendation
+- `## PO Review` - per-AC verdict and overall status
 
 ---
 
@@ -109,11 +109,11 @@ The workflow is complete when all of the following are present in shared memory:
 
 | Aspect | /pr | /sprint |
 |--------|-----|---------|
-| PO analysis | ⚠️ Requires prior `/analyze` | ✅ Included |
-| Architecture | ⚠️ Requires prior `/analyze` | ✅ Included |
-| UX review | ❌ Skipped | ✅ Included |
-| CI pipeline check | ❌ Skipped | ✅ Included |
-| Security audit | ✅ Included | ✅ Included |
-| QA assessment | ✅ Included | ✅ Included |
-| PO final review | ✅ Included | ✅ Included |
+| PO analysis | [WARN] Requires prior `/analyze` | [PASS] Included |
+| Architecture | [WARN] Requires prior `/analyze` | [PASS] Included |
+| UX review | [FAIL] Skipped | [PASS] Included |
+| CI pipeline check | [FAIL] Skipped | [PASS] Included |
+| Security audit | [PASS] Included | [PASS] Included |
+| QA assessment | [PASS] Included | [PASS] Included |
+| PO final review | [PASS] Included | [PASS] Included |
 | Best for | Bug fixes, refactors | New features, significant changes |

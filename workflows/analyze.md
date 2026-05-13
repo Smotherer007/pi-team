@@ -1,14 +1,14 @@
 ---
-description: Lightweight workflow — analysis and planning only, no implementation
+description: Lightweight workflow - analysis and planning only, no implementation
 ---
 
 # Workflow: Analyze
 
-**Purpose:** Understand a requirement and produce a PO-ready user story plus a concrete architectural direction — without writing or modifying any code.
+**Purpose:** Understand a requirement and produce a PO-ready user story plus a concrete architectural direction - without writing or modifying any code.
 
 **When to use:** Use this workflow when you need to assess scope, align on requirements, or plan architecture before committing to implementation. Use `/sprint` or `/pr` when you are ready to implement.
 
-**Input:** `$@` — the raw requirement, feature description, or bug report passed as an argument.
+**Input:** `$@` - the raw requirement, feature description, or bug report passed as an argument.
 
 ---
 
@@ -18,7 +18,7 @@ Run as a team with roles: `["po", "architect"]`
 
 ---
 
-### Step 1 — po (Requirements Analysis)
+### Step 1 - po (Requirements Analysis)
 
 **Reads:** raw input `$@`
 
@@ -32,9 +32,9 @@ Run as a team with roles: `["po", "architect"]`
 
 ---
 
-### Step 2 — architect (Architecture Planning)
+### Step 2 - architect (Architecture Planning)
 
-**Reads:** `## PO Analysis` from shared memory (required — stops with `## Blockers` if missing)
+**Reads:** `## PO Analysis` from shared memory (required - stops with `## Blockers` if missing)
 
 **Produces:** `## Architecture` in shared memory, containing:
 - Component diagram (text-based, using `→` to show relationships)

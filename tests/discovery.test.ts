@@ -1,5 +1,5 @@
 /**
- * Tests for discovery.ts — profile parsing and loading
+ * Tests for discovery.ts - profile parsing and loading
  *
  * Note: discovery.ts imports @earendil-works/pi-coding-agent which is
  * only available inside the pi runtime. These tests are minimal and

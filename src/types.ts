@@ -32,6 +32,23 @@ export type Task = {
   readonly status: TaskStatus;
 };
 
+// ─── Agent Progress (live tracking during execution) ────────────────────────
+
+export type AgentProgress = {
+  agent: string;
+  status: "pending" | "running" | "completed" | "failed";
+  currentTool?: string;
+  currentToolArgs?: string;
+  currentToolStartedAt?: number;
+  currentPath?: string;
+  recentTools: Array<{ tool: string; args: string; endMs: number }>;
+  turnCount: number;
+  tokens: number;
+  lastActivityAt?: number;
+  startedAt: number;
+  error?: string;
+};
+
 // ─── Agent Execution Result ─────────────────────────────────────────────────
 
 export type UsageStats = {
@@ -54,6 +71,7 @@ export type AgentResult = {
   readonly usage: UsageStats;
   readonly stopReason?: string;
   readonly errorMessage?: string;
+  readonly progress?: AgentProgress;
 };
 
 // ─── Shared Memory ──────────────────────────────────────────────────────────

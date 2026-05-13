@@ -4,9 +4,9 @@
  * Registers the `team` tool with pi. Teams run in background (non-blocking).
  *
  * Commands:
- *   /team-start <file.md>  — Start team from task file
- *   /team-status            — List running/completed teams
- *   /team-result <id>       — Show full result in editor
+ *   /team-start <file.md>  - Start team from task file
+ *   /team-status            - List running/completed teams
+ *   /team-result <id>       - Show full result in editor
  *
  * Results are injected as follow-up messages when complete.
  */
@@ -17,11 +17,11 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { discoverProfiles } from "./discovery";
-import { aggregateUsage, formatUsageStats, resultIcon, statusIcon, truncate } from "./format";
+import { aggregateUsage, formatProgress, formatUsageStats, resultIcon, statusIcon, truncate } from "./format";
 import { executeTeam } from "./orchestrator";
 import { buildExecutionPlan, describePlan } from "./planner";
 import { renderTeamCall, renderTeamResult } from "./renderer";
-import type { AgentResult, AgentScope, TeamDetails } from "./types";
+import type { AgentProgress, AgentResult, AgentScope, TeamDetails } from "./types";
 
 // ─── Background Team State ─────────────────────────────────────────────────
 
@@ -33,6 +33,7 @@ type TeamRun = {
   results?: readonly AgentResult[];
   memoryPath?: string | null;
   error?: string;
+  progress: Map<string, AgentProgress>;
 };
 
 let nextTeamId = 1;
@@ -104,18 +105,20 @@ async function startTeam(
 
   // Create run
   const runId = nextTeamId++;
-  const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString() };
+  const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString(), progress: new Map() };
   teamRuns.set(runId, run);
 
   ctx.ui.notify(
-    `Team #${runId} started — ${planDescription}\n/team-status to check progress.`,
+    `Team #${runId} started - ${planDescription}\n/team-status to check progress.`,
     "info",
   );
 
   // Background execution
   const cwd = ctx.cwd;
 
-  executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview)
+  executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview, (role, progress) => {
+      run.progress.set(role, progress);
+    })
     .then(({ results, memoryPath }) => {
       run.status = results.every((r) => r.exitCode === 0) ? "done" : "failed";
       run.results = results;
@@ -251,7 +254,7 @@ export default function (pi: ExtensionAPI) {
         const totalCount = run.results?.length ?? "?";
 
         lines.push(
-          `${icon} #${run.id} [${run.status}] ${doneCount}/${totalCount} agents — ${taskPreview}`,
+          `${icon} #${run.id} [${run.status}] ${doneCount}/${totalCount} agents - ${taskPreview}`,
         );
 
         if (run.results) {
@@ -262,6 +265,12 @@ export default function (pi: ExtensionAPI) {
           }
           const total = aggregateUsage(run.results.map((r) => r.usage));
           if (total.turns > 0) lines.push(`    ∑ ${formatUsageStats(total)}`);
+        } else if (run.status === "running" && run.progress.size > 0) {
+          // Show live progress for running agents
+          for (const [role, prog] of run.progress) {
+            const progStr = formatProgress(prog);
+            lines.push(`    ... ${role}: ${progStr}`);
+          }
         }
 
         if (run.memoryPath) lines.push(`    Memory: ${run.memoryPath}`);
@@ -380,12 +389,14 @@ export default function (pi: ExtensionAPI) {
 
       // Create run
       const runId = nextTeamId++;
-      const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString() };
+      const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString(), progress: new Map() };
       teamRuns.set(runId, run);
 
       // Start background execution
       const cwd = ctx.cwd;
-      executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview)
+      executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview, (role, progress) => {
+          run.progress.set(role, progress);
+        })
         .then(({ results, memoryPath }) => {
           run.status = results.every((r) => r.exitCode === 0) ? "done" : "failed";
           run.results = results;
@@ -443,7 +454,7 @@ function buildPlanForDisplay(
 
 function buildTeamResultText(run: TeamRun): string {
   const lines: string[] = [];
-  lines.push(`# Team #${run.id} — ${run.status.toUpperCase()}`);
+  lines.push(`# Team #${run.id} - ${run.status.toUpperCase()}`);
   lines.push(`Task: ${run.task}`);
   lines.push(`Started: ${run.startedAt}`);
   lines.push("");

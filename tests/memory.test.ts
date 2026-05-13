@@ -1,5 +1,5 @@
 /**
- * Tests for memory.ts — shared memory operations
+ * Tests for memory.ts - shared memory operations
  */
 
 import * as fs from "node:fs";

@@ -9,9 +9,10 @@
  */
 
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
-import type { AgentResult, TeamDetails } from "./types";
+import type { AgentProgress, AgentResult, TeamDetails } from "./types";
 import {
   aggregateUsage,
+  formatProgress,
   formatUsageStats,
   resultIcon,
   statusIcon,
@@ -136,6 +137,12 @@ function renderCollapsed(details: TeamDetails, theme: any): Text {
 
       if (r.stopReason && r.stopReason !== "end_turn") {
         text += ` ${theme.fg("muted", `[${r.stopReason}]`)}`;
+      }
+
+      // Show live progress (tool + path) like pi-subagents
+      if (r.progress && r.progress.currentTool) {
+        const progStr = formatProgress(r.progress);
+        if (progStr) text += ` ${theme.fg("dim", `[${progStr}]`)}`;
       }
 
       if (displayItems.length === 0) {

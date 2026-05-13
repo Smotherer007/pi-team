@@ -1,5 +1,5 @@
 /**
- * Tests for planner.ts — execution plan builder, cycle detection, topological sort
+ * Tests for planner.ts - execution plan builder, cycle detection, topological sort
  */
 
 import { describe, expect, it } from "vitest";
