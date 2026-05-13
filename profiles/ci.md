@@ -2,7 +2,6 @@
 role: ci
 displayName: CI Engineer
 reportsTo: dev
-model: deepseek-v4-pro
 tools: read, bash, grep, find, ls
 maxTurns: 0
 ---

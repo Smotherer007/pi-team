@@ -2,7 +2,6 @@
 role: dev
 displayName: Developer
 reportsTo: po
-model: deepseek-v4-pro
 tools: read, write, edit, bash, grep, find, ls
 maxTurns: 0
 ---

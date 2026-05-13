@@ -2,7 +2,6 @@
 role: po
 displayName: Product Owner
 reportsTo: null
-model: deepseek-v4-flash
 tools: read, grep, find, ls
 maxTurns: 0
 ---

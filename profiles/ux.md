@@ -2,7 +2,6 @@
 role: ux
 displayName: UX Designer
 reportsTo: po
-model: deepseek-v4-pro
 tools: read, grep, find, ls, bash
 maxTurns: 0
 ---
