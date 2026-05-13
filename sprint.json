@@ -1,0 +1,107 @@
+{
+  "phases": [
+    {
+      "id": "requirements",
+      "role": "po",
+      "title": "Requirements Analysis",
+      "description": "Analyze the task and define what needs to be built.",
+      "steps": [
+        "Read the shared memory and understand the task",
+        "Define user stories with acceptance criteria",
+        "Document findings under '## PO Analysis' in shared memory",
+        "Include clear handoff: what the architect and designer need to know"
+      ]
+    },
+    {
+      "id": "design",
+      "role": "ux",
+      "title": "UX Design",
+      "description": "Design the user experience based on requirements.",
+      "steps": [
+        "Read the PO analysis and requirements",
+        "Design the interaction flow, information architecture, and visual layout",
+        "Review language, error messages, and output formatting",
+        "Document under '## UX Review' with specific design decisions",
+        "Include clear handoff: what the architect needs to consider"
+      ]
+    },
+    {
+      "id": "architecture",
+      "role": "architect",
+      "title": "Architecture Design",
+      "description": "Design the technical architecture based on requirements and UX.",
+      "steps": [
+        "Read PO analysis and UX design from shared memory",
+        "Propose system architecture: components, modules, data flow",
+        "Recommend tools, frameworks, libraries with justification",
+        "Identify technical risks and mitigation strategies",
+        "Document under '## Architecture' with diagrams (text-based) and decisions",
+        "Include clear handoff: specific technical guidance for the developer"
+      ]
+    },
+    {
+      "id": "implementation",
+      "role": "dev",
+      "title": "Implementation",
+      "description": "Implement the feature following the architecture and design.",
+      "steps": [
+        "Read all previous phases in shared memory",
+        "Clarify any unclear requirements (ask questions first)",
+        "Implement following Clean Code and Data-Oriented Programming principles",
+        "Write tests for all new code",
+        "Commit with conventional format and release notes",
+        "Push to repository",
+        "Document under '## Developer Implementation' with file list and decisions"
+      ]
+    },
+    {
+      "id": "ci-check",
+      "role": "ci",
+      "title": "CI Verification",
+      "description": "Verify the build, tests, and deployment readiness.",
+      "steps": [
+        "Run the test suite",
+        "Check build and linting",
+        "Verify deployment configuration",
+        "Document under '## CI Review' with pass/fail status"
+      ]
+    },
+    {
+      "id": "security",
+      "role": "sr",
+      "title": "Security Audit",
+      "description": "Audit the implementation for security vulnerabilities.",
+      "steps": [
+        "Review all changed code for vulnerabilities",
+        "Check input validation, injection risks, data safety",
+        "Verify secrets and sensitive data handling",
+        "Document under '## Security Audit' with findings by severity"
+      ]
+    },
+    {
+      "id": "quality",
+      "role": "qa",
+      "title": "Quality Assessment",
+      "description": "Holistic quality review across all dimensions.",
+      "steps": [
+        "Review all previous phase outputs",
+        "Assess code, test, and documentation quality",
+        "Rate each dimension 1-10",
+        "Document under '## QA Report' with scores and recommendations"
+      ]
+    },
+    {
+      "id": "review",
+      "role": "po",
+      "title": "Final Review",
+      "description": "Final acceptance review by the Product Owner.",
+      "steps": [
+        "Read all phase outputs in shared memory",
+        "Verify all acceptance criteria are met",
+        "Check that all quality gates passed",
+        "Provide final decision: OK Accepted or FAIL Rework needed",
+        "Document under '## PO Review'"
+      ]
+    }
+  ]
+}
