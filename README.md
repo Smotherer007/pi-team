@@ -7,11 +7,11 @@ A pi extension that orchestrates a **team of AI agents** with role-based profile
 ```
 PO (Product Owner)
   ├── UX Designer          — Interaction flow, language, layout
-  └── Software Architect   — System design, API contracts, technology choices
-        └── Developer      — Implementation, tests, commit + push
-              ├── CI Engineer       — Pipeline, build, test verification
-              ├── Security Reviewer — Vulnerability audit, data safety
-              └── Quality Manager   — Holistic quality score 1-10
+  ├── Software Architect   — System design, API contracts, technology choices
+  └── Developer            — Implementation, tests, commit + push
+        ├── CI Engineer       — Pipeline, build, test verification
+        ├── Security Reviewer — Vulnerability audit, data safety
+        └── Quality Manager   — Holistic quality score 1-10
 ```
 
 - **7 profiles** defined as Markdown files with YAML frontmatter
