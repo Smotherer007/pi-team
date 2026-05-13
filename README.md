@@ -107,20 +107,21 @@ src/
 ## Installation
 
 ```bash
-mkdir -p ~/.pi/agent/extensions/pi-team
-for f in index.ts discovery.ts memory.ts planner.ts runner.ts orchestrator.ts format.ts renderer.ts types.ts instructions.ts; do
-  ln -sf ~/Documents/workspaces/pi-team/src/$f ~/.pi/agent/extensions/pi-team/$f
-done
+# Install from npm (once published)
+pi install npm:@patimweb/pi-team
 
-mkdir -p ~/.pi/agent/team/profiles
-for f in ~/Documents/workspaces/pi-team/profiles/*.md; do
-  ln -sf "$f" ~/.pi/agent/team/profiles/$(basename "$f")
-done
+# Install from local path during development
+pi install /path/to/pi-team
+```
 
-cp ~/Documents/workspaces/pi-team/sprint.json ~/.pi/agent/team/sprint.json
+After installing the extension, set up the agent profiles, sprint phases, and workflow prompts:
 
+```bash
+# Copy profiles and sprint configuration
+cp -r /path/to/pi-team/profiles/ ~/.pi/agent/team/profiles/
+cp /path/to/pi-team/sprint.json ~/.pi/agent/team/sprint.json
+
+# Copy workflow prompts
 mkdir -p ~/.pi/agent/prompts
-for f in ~/Documents/workspaces/pi-team/workflows/*.md; do
-  ln -sf "$f" ~/.pi/agent/prompts/$(basename "$f")
-done
+cp /path/to/pi-team/workflows/*.md ~/.pi/agent/prompts/
 ```
