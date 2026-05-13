@@ -71,6 +71,14 @@ teamReview: true
 Fix timeout bugs in the IMAP client...
 ```
 
+### Example Task
+
+See [`tasks/portalgun.md`](tasks/portalgun.md) for a complete example — a Portal Gun mutator for Unreal Tournament 99. Start it with:
+
+```
+/team-start tasks/portalgun.md
+```
+
 ## Shared Memory
 
 Written to `.pi/team/team-memory.md`. Each agent reads all previous sections and appends its own.
