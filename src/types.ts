@@ -125,7 +125,7 @@ export type ProfileDiscoveryResult = {
 export const MAX_TURNS_HARD_LIMIT = 20;
 
 /** Default timeout per agent turn in seconds. */
-export const TURN_TIMEOUT_SECONDS = 120;
+export const TURN_TIMEOUT_SECONDS = 300;
 
 /** Total timeout buffer (maxTurns * TURN_TIMEOUT + this). */
-export const TOTAL_TIMEOUT_BUFFER_SECONDS = 60;
+export const TOTAL_TIMEOUT_BUFFER_SECONDS = 120;

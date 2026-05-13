@@ -42,7 +42,7 @@ export async function runAgent(
     : Math.min(profile.maxTurns, MAX_TURNS_HARD_LIMIT);
   const totalTimeoutMs =
     maxTurns === Infinity
-      ? 30 * 60 * 1000 // 30 minute hard cap for unlimited
+      ? 60 * 60 * 1000 // 60 minute hard cap for unlimited
       : (maxTurns * TURN_TIMEOUT_SECONDS + TOTAL_TIMEOUT_BUFFER_SECONDS) * 1000;
 
   // Build the full system prompt

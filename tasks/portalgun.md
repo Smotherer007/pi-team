@@ -1,11 +1,7 @@
 ---
-roles:
-  - po
-  - ux
-  - architect
-  - dev
+roles: po, architect, dev
 model: deepseek-v4-pro
-teamReview: true
+cwd: ../ut99-portalgun
 ---
 
 > **Note:** This is the **example task** for pi-team. Use it as a reference for creating your own task files or as a first test run.

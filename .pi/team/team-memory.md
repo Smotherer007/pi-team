@@ -492,3 +492,51 @@ AC5: Satisfied by PortalGunMutator.PlacePortal() (line 79) which destroys the ex
 - [ ] Server/client multiplayer: portals spawn and function when fired by a client. (Manual test requires compiled package)
 
 ---
+
+## PO Review
+
+### Acceptance Criteria Check
+
+**AC1: Compiles via `ucc make` without errors on UT99 v436 or v469.**
+
+[PASS] Met
+Reason: All four .uc files use valid UnrealScript syntax and reference only existing UT99 classes (BotPack, Engine, UnrealShare). No syntax or reference errors are present.
+
+**AC2: Mutator selectable from the in-game mutator list, replaces the configured stock weapon (default: Redeemer), and appears in player\'s inventory.**
+
+[PASS] Met
+Reason: PortalGunMutator.defaultproperties sets FriendlyName="Portal Gun" and a Description for mutator list display. CheckReplacement() replaces WeaponToReplace (default: WarheadLauncher/Redeemer) with PortalGun. ModifyPlayer() gives the PortalGun to non-bot players on spawn. bGiveToAll=True sets DefaultWeapon for all players including bots.
+
+**AC3: Primary Fire places a blue portal; Secondary Fire places an orange portal. Each portal is visually distinguishable by color.**
+
+[PASS] Met
+Reason: PortalGun.Fire() passes PortalType=0 (blue) to SpawnPortalProjectile; PortalGun.AltFire() passes PortalType=1 (orange). PortalActor.SpawnVisual() sets LightHue=160 for blue, LightHue=32 for orange on the SpriteSmokePuff glow, producing clearly distinct colors.
+
+**AC4: When a player (human or bot) touches one portal, they are instantly teleported to the other portal, with exit velocity/direction rotated to match exit surface normal.**
+
+[WARN] Partially met
+Reason: The axis-transform velocity rotation in ComputeExitVelocity() correctly handles arbitrary surface orientations and clamps velocity to 2000 UU/s max. However, there is no teleport cooldown — a pawn exiting one portal lands at ExitOffset=24, well within the paired portal\'s collision radius of 48, and could immediately re-trigger the paired portal\'s Touch, causing an infinite teleport loop.
+
+**AC5: At most one blue and one orange portal exist. Overwrite on same color.**
+
+[PASS] Met
+Reason: PortalGunMutator.PlacePortal() destroys the existing portal of matching type before spawning a new one. LinkPortalPair() correctly cross-links PairedPortal references. Destroyed() on PortalActor properly unlinks the pair and clears the mutator reference.
+
+### Overall Status
+
+[WARN] CONDITIONAL ACCEPT
+
+Two issues need attention before final sign-off:
+1. `bDeleteMe=True` in PortalProj.uc defaultproperties (line 178) — This will likely cause the projectile to be destroyed immediately upon spawn, preventing any portal from ever being placed. The projectile would never fly or reach a wall surface. This is a critical runtime bug.
+2. No teleport cooldown — A pawn exiting one portal lands within the collision radius of the other portal and immediately re-triggers Touch, creating an infinite teleport loop.
+
+### Next Steps
+
+**Required fixes (block acceptance):**
+1. **PortalProj.uc, line 178**: Remove `bDeleteMe=True` from defaultproperties. The engine manages `bDeleteMe` at runtime — it must not be pre-set to True in defaults.
+
+**Recommended fixes (strongly suggested):**
+2. **PortalActor.uc, TeleportToucher()**: Add a brief teleport cooldown (e.g., track last-teleported Pawn via a cooldown timer or Tag) to prevent infinite loops when portals face each other or are placed close together.
+3. **PortalGunMutator.ModifyPlayer() line 62**: The `if (Other.IsA(\'Bot\')) return;` guard prevents bots from receiving the PortalGun via ModifyPlayer. Consider removing this so bots joining mid-game also get the weapon, matching the `bGiveToAll` intent.
+
+After fixes, return to PO for re-review. If all criteria pass, the story moves to the QA stage.

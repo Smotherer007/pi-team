@@ -1,79 +1,102 @@
-# pi-team - Team Agent Orchestration for pi
+# pi-team — Sprint-Team Extension für pi
 
-A pi extension that orchestrates a **team of AI agents** with role-based profiles, shared memory, sprint phases, and structured handoffs between agents.
+**pi-team** ist eine pi-Erweiterung, die auf [`pi-subagents`](https://github.com/nicobailon/pi-subagents) aufbaut.  
+Sie bringt **Rollen‑Profile**, **Sprint‑Phasen**, **Shared Memory** und `/team‑start`‑Kommandos mit.
 
-## Concept
+> pi-subagents übernimmt das Agenten‑Spawnen und Chain‑Management.  
+> pi‑team stellt den Sprint‑Workflow und die Team‑Infrastruktur bereit.
+
+## Konzept
 
 ```
 PO (Product Owner)
-  ├── UX Designer          - Interaction flow, language, layout
-  ├── Software Architect   - System design, API contracts, technology choices
-  └── Developer            - Implementation, tests, commit + push
-        ├── CI Engineer       - Pipeline, build, test verification
-        ├── Security Reviewer - Vulnerability audit, data safety
-        └── Quality Manager   - Holistic quality score 1-10
+  ├── UX Designer          – Interaction Flow, Sprache, Layout
+  ├── Software Architect   – Systemdesign, API‑Verträge, Technologie‑Entscheidungen
+  └── Developer            – Implementierung, Tests, Commit + Push
+        ├── CI Engineer       – Build, Test‑Suite, Deployment‑Check
+        ├── Security Reviewer – Sicherheits‑Audit, Data Safety
+        └── Quality Manager   – Ganzheitlicher Quality Score 1–10
 ```
 
-- **7 profiles** defined as Markdown files with YAML frontmatter
-- **sprint.json** defines 8 ordered phases (requirements → design → architecture → implementation → ci → security → quality → review)
-- **Shared memory** (`.pi/team/team-memory.md`) carries context between agents
-- **Background execution** - teams run non-blocking, results injected as follow-up
-- **`/team-start`**, **`/team-status`**, **`/team-result`** commands
-- **3 workflow prompts**: `/sprint`, `/pr`, `/analyze`
+- **7 Profile** als Markdown‑Dateien (pi‑subagents‑kompatibel)
+- **sprint.json** definiert 8 Phasen (requirements → design → architecture → implementation → ci → security → quality → review)
+- **Shared Memory** (`.pi/team/team-memory.md`) trägt Kontext zwischen Agenten
+- **`/team-start`**, **`/team-status`**, **`/team-result`** Kommandos
 
-## Profiles
+## Abhängigkeiten
 
-| Profile | Role | Model | reportsTo |
-|---------|------|-------|-----------|
-| `po.md` | Product Owner | deepseek-v4-flash | null |
-| `ux.md` | UX Designer | deepseek-v4-pro | po |
-| `architect.md` | Software Architect | deepseek-v4-pro | po |
-| `dev.md` | Developer | deepseek-v4-pro | po |
-| `ci.md` | CI Engineer | deepseek-v4-pro | dev |
-| `security.md` | Security Reviewer (sr) | deepseek-v4-pro | dev |
-| `qa.md` | Quality Manager | deepseek-v4-pro | dev |
-
-Profiles are loaded from `~/.pi/agent/team/profiles/` (user) or `.pi/team/profiles/` (project).
-
-## Sprint Phases (`sprint.json`)
-
-```
-requirements → design → architecture → implementation → ci-check → security → quality → review
+```json
+"dependencies": {
+  "pi-subagents": "^0.24.0"
+}
 ```
 
-Each phase defines: `id`, `role`, `title`, `description`, `steps`. Edit `~/.pi/agent/team/sprint.json` to customize.
+pi‑subagents muss zusätzlich als pi‑Package registriert sein (in `~/.pi/agent/settings.json`):
 
-## Commands
+```json
+"packages": [
+  "npm:pi-subagents",
+  …
+]
+```
 
-| Command | Description |
-|---------|-------------|
-| `/team-start <file.md>` | Start team from task file with frontmatter |
-| `/team-status` | List all running and completed teams |
-| `/team-result <id>` | Load full result into editor |
+## Profile
 
-## Workflows
+Profile liegen im pi‑subagents‑Format unter `.pi/agents/team/` (Projekt) oder `~/.pi/agent/agents/team/` (User):
 
-| Workflow | Roles | When to use |
-|----------|-------|-------------|
-| `/sprint` | po, ux, architect, dev, ci, sr, qa | New features, full quality gates |
-| `/pr` | dev, sr, qa | Bug fixes, small changes |
-| `/analyze` | po, architect | Requirements + architecture only |
+| Agent | Rolle | Model | Tools |
+|-------|-------|-------|-------|
+| `po` | Product Owner | deepseek‑v4‑flash | read, write, edit, grep, find, ls, bash, web_fetch |
+| `ux` | UX Designer | deepseek‑v4‑pro | read, write, edit, grep, find, ls, bash, web_fetch |
+| `architect` | Software Architect | deepseek‑v4‑pro | read, write, edit, grep, find, ls, bash, web_fetch |
+| `dev` | Developer | deepseek‑v4‑flash | read, write, edit, bash, grep, find, ls, web_fetch |
+| `ci` | CI Engineer | deepseek‑v4‑pro | read, write, edit, bash, grep, find, ls, web_fetch |
+| `sr` | Security Reviewer | deepseek‑v4‑pro | read, write, edit, bash, grep, find, ls, web_fetch |
+| `qa` | Quality Manager | deepseek‑v4‑pro | read, write, edit, bash, grep, find, ls, web_fetch |
 
-## Task File Format
+Jedes Profil hat `defaultReads: .pi/team/team-memory.md` — dadurch liest jeder Agent automatisch das Shared Memory.
+
+## Sprint‑Phasen (`sprint.json`)
+
+```text
+requirements → design → architecture → implementation → ci‑check → security → quality → review
+```
+
+Jede Phase definiert: `id`, `role`, `title`, `description`, `steps`.
+
+## Kommandos
+
+| Kommando | Beschreibung |
+|----------|-------------|
+| `/team-start <file.md>` | Sprint starten: Task parsen, Memory initialisieren, Chain ans LLM senden |
+| `/team-status` | Fortschritt des Teams im Shared Memory anzeigen |
+| `/team-result` | Komplettes Shared Memory im Editor öffnen |
+
+### Ablauf `/team-start`
+
+1. Task‑Datei parsen (Frontmatter + Body)
+2. `sprint.json` laden, Phasen filtern (falls `roles` angegeben)
+3. `.pi/team/team-memory.md` initialisieren (Task + DoD‑Checkliste)
+4. Dem LLM einen Prompt senden: „Nutze `subagent`‑Tool mit Chain‑Mode“
+5. LLM ruft `subagent({ chain: [{ agent: "po", … }, …] })` auf
+6. pi‑subagents führt die Agenten **sequentiell** aus
+7. Jeder Agent liest/schreibt `team-memory.md` → nächster Agent sieht den aktuellen Stand
+8. `/team-status` zeigt den Live‑Fortschritt
+
+## Task‑Datei Format
 
 ```markdown
 ---
-roles: po,architect,dev,sr,qa
-model: deepseek-v4-flash
-teamReview: true
+roles: po,ux,architect,dev,ci,sr,qa
+cwd: ../mein-projekt
 ---
 
-Fix timeout bugs in the IMAP client...
+Implementiere einen OAuth‑Login für die REST‑API.
 ```
 
-### Example Task
+### Beispiel‑Task
 
-See [`tasks/portalgun.md`](tasks/portalgun.md) for a complete example - a Portal Gun mutator for Unreal Tournament 99. Start it with:
+Siehe [`tasks/portalgun.md`](tasks/portalgun.md) — ein Portal‑Gun‑Mutator für Unreal Tournament 99.
 
 ```
 /team-start tasks/portalgun.md
@@ -81,47 +104,54 @@ See [`tasks/portalgun.md`](tasks/portalgun.md) for a complete example - a Portal
 
 ## Shared Memory
 
-Written to `.pi/team/team-memory.md`. Each agent reads all previous sections and appends its own.
+Datei: `.pi/team/team-memory.md`
 
-## Architecture
+Jeder Agent …
+1. liest das Memory beim Start (via `defaultReads`)
+2. hängt seine Sektion an: `## PO Analysis`, `## UX Review`, `## Architecture`, …
+3. der nächste Agent sieht alle vorherigen Sektionen
 
-```
+## Architektur
+
+```text
 src/
-├── types.ts          - All data types (readonly, no classes)
-├── discovery.ts      - Profile loading from .md files
-├── instructions.ts   - Sprint phase loader (reads sprint.json)
-├── planner.ts        - buildExecutionPlan (topological sort by reportsTo)
-├── memory.ts         - Shared memory CRUD operations
-├── runner.ts         - Agent subprocess (spawn + stream + timeout)
-├── orchestrator.ts   - executeTeam pipeline
-├── format.ts         - Token/usage formatting utilities
-├── renderer.ts       - TUI collapsed/expanded views
-└── index.ts          - Extension entry, tool registration, commands
+├── index.ts          – Extension Entry, /team‑start, /team‑status, /team‑result
+├── (runner.ts)       – [weggefallen] → ersetzt durch pi‑subagents
+├── (orchestrator.ts) – [weggefallen] → ersetzt durch pi‑subagents Chain
+├── (planner.ts)      – [weggefallen]
+├── (discovery.ts)    – [weggefallen]
+├── (types.ts)        – [weggefallen]
+├── (format.ts)       – [weggefallen]
+├── (renderer.ts)     – [weggefallen]
+├── (instructions.ts) – [weggefallen]
+└── (memory.ts)       – [weggefallen]
 ```
 
-### Principles
-- **Data-Oriented Programming**: All data as plain immutable records, no classes
-- **Clean Code**: Single responsibility per module, pure functions, isolated side effects
-- **No inheritance**: Only types + functions, composition over inheritance
+```text
+profiles/            – Agent‑Profile (pi‑subagents‑Format)
+sprint.json          – Sprint‑Phasen
+workflows/           – Prompt‑Templates
+tasks/               – Beispiel‑Tasks
+```
+
+Die bisherigen Module (`runner`, `orchestrator`, …) sind **nicht mehr nötig**, weil pi‑subagents das Agenten‑Management vollständig übernimmt.  
+pi‑team ist jetzt eine **dünne Orchestrierungsschicht**: Task → Memory → Chain‑Prompt.
 
 ## Installation
 
 ```bash
-# Install from npm (once published)
-pi install npm:@patimweb/pi-team
+# 1. pi‑subagents als pi‑Package registrieren
+pi install npm:pi-subagents
 
-# Install from local path during development
-pi install /path/to/pi-team
+# 2. pi‑team aus lokalem Pfad installieren
+pi install /pfad/zu/pi-team
 ```
 
-After installing the extension, set up the agent profiles, sprint phases, and workflow prompts:
+Profile und Sprint werden automatisch aus dem Projektverzeichnis geladen (`.pi/agents/team/` und `.pi/team/sprint.json`).
+
+Falls du die Profile global nutzen willst:
 
 ```bash
-# Copy profiles and sprint configuration
-cp -r /path/to/pi-team/profiles/ ~/.pi/agent/team/profiles/
-cp /path/to/pi-team/sprint.json ~/.pi/agent/team/sprint.json
-
-# Copy workflow prompts
-mkdir -p ~/.pi/agent/prompts
-cp /path/to/pi-team/workflows/*.md ~/.pi/agent/prompts/
+cp profiles/*.md ~/.pi/agent/agents/team/
+cp sprint.json ~/.pi/agent/team/
 ```

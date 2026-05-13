@@ -42,5 +42,8 @@
       "./src/index.ts"
     ],
     "image": "https://raw.githubusercontent.com/Smotherer007/pi-team/main/screenshot.png"
+  },
+  "dependencies": {
+    "pi-subagents": "^0.24.2"
   }
 }

@@ -1,51 +1,58 @@
 /**
  * pi-team Extension – Entry Point
  *
- * Registers the `team` tool with pi. Teams run in background (non-blocking).
+ * Team orchestration built on pi-subagents.
+ * pi-team provides the sprint workflow, shared memory, and commands.
+ * pi-subagents handles agent spawning, chain execution, and progress.
  *
  * Commands:
- *   /team-start <file.md>  - Start team from task file
- *   /team-status            - List running/completed teams
- *   /team-result <id>       - Show full result in editor
- *
- * Results are injected as follow-up messages when complete.
+ *   /team-start <file.md>  - Initialize team memory and show sprint chain
+ *   /team-status            - Show team memory status
+ *   /team-result            - Open team memory in editor
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
-import { discoverProfiles } from "./discovery";
-import { aggregateUsage, formatProgress, formatUsageStats, resultIcon, statusIcon, truncate } from "./format";
-import { executeTeam } from "./orchestrator";
-import { buildExecutionPlan, describePlan } from "./planner";
-import { renderTeamCall, renderTeamResult } from "./renderer";
-import type { AgentProgress, AgentResult, AgentScope, TeamDetails } from "./types";
 
-// ─── Background Team State ─────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────
 
-type TeamRun = {
-  id: number;
-  task: string;
-  status: "running" | "done" | "failed";
-  startedAt: string;
-  results?: readonly AgentResult[];
-  memoryPath?: string | null;
-  error?: string;
-  progress: Map<string, AgentProgress>;
+const MEMORY_PATH = ".pi/team/team-memory.md";
+const SPRINT_PATHS = [".pi/team/sprint.json", "sprint.json"];
+
+// ─── Sprint Phase ───────────────────────────────────────────────────────────
+
+type SprintPhase = {
+  id: string;
+  role: string;
+  title: string;
+  description: string;
+  steps: string[];
 };
 
-let nextTeamId = 1;
-const teamRuns = new Map<number, TeamRun>();
+type Sprint = {
+  phases: SprintPhase[];
+};
+
+function loadSprint(cwd: string): Sprint | null {
+  for (const relPath of SPRINT_PATHS) {
+    const sprintFile = path.join(cwd, relPath);
+    if (!fs.existsSync(sprintFile)) continue;
+    try {
+      return JSON.parse(fs.readFileSync(sprintFile, "utf-8")) as Sprint;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 
 // ─── Task File Parser ──────────────────────────────────────────────────────
 
 type TaskFrontmatter = {
-  agentScope?: string;
   roles?: string;
   model?: string;
-  teamReview?: string;
+  cwd?: string;
 };
 
 function parseTaskFile(content: string): { frontmatter: TaskFrontmatter; body: string } {
@@ -64,127 +71,60 @@ function parseTaskFile(content: string): { frontmatter: TaskFrontmatter; body: s
   return { frontmatter, body };
 }
 
-// ─── Shared Start Function ─────────────────────────────────────────────────
+// ─── Memory Operations ─────────────────────────────────────────────────────
 
-async function startTeam(
-  ctx: any,
-  pi: ExtensionAPI,
-  task: string,
-  agentScope: AgentScope,
-  roles?: string[],
-  model?: string,
-  teamReview?: boolean,
-): Promise<void> {
-  // Discover profiles
-  const discovery = discoverProfiles(ctx.cwd, agentScope);
+function writeMemory(cwd: string, task: string, phases: SprintPhase[]): void {
+  const memoryFile = path.join(cwd, MEMORY_PATH);
+  const dir = path.dirname(memoryFile);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  if (discovery.profiles.length === 0) {
-    ctx.ui.notify(
-      `No team profiles found. Create them in ~/.pi/agent/team/profiles/ or .pi/team/profiles/`,
-      "error",
-    );
-    return;
+  const lines: string[] = [];
+  lines.push("# Team Memory");
+  lines.push("");
+  lines.push(`## Task: ${task}`);
+  lines.push("");
+  lines.push("## DoD");
+  for (const phase of phases) {
+    lines.push(`- [ ] ${phase.role}: ${phase.title}`);
   }
+  lines.push("");
+  lines.push("---");
+  lines.push("");
 
-  // Validate roles
-  if (roles && roles.length > 0) {
-    const profileRoles = new Set(discovery.profiles.map((p) => p.role));
-    const unknown = roles.filter((r) => !profileRoles.has(r));
-    if (unknown.length > 0) {
-      const available = discovery.profiles.map((p) => `${p.role} (${p.displayName})`).join(", ");
-      ctx.ui.notify(`Unknown role(s): ${unknown.join(", ")}.\nAvailable: ${available}`, "error");
-      return;
-    }
-  }
-
-  // Plan
-  const planDescription = describePlan(
-    buildPlanForDisplay(discovery.profiles, task, roles),
-    discovery.profiles,
-  );
-
-  // Create run
-  const runId = nextTeamId++;
-  const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString(), progress: new Map() };
-  teamRuns.set(runId, run);
-
-  ctx.ui.notify(
-    `Team #${runId} started - ${planDescription}\n/team-status to check progress.`,
-    "info",
-  );
-
-  // Background execution
-  const cwd = ctx.cwd;
-
-  executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview, (role, progress) => {
-      run.progress.set(role, progress);
-    })
-    .then(({ results, memoryPath }) => {
-      run.status = results.every((r) => r.exitCode === 0) ? "done" : "failed";
-      run.results = results;
-      run.memoryPath = memoryPath;
-
-      const doneCount = results.filter((r) => r.exitCode === 0).length;
-      pi.sendMessage(
-        {
-          customType: "team-result",
-          content: `Team #${runId} done: ${doneCount}/${results.length} agents. /team-result ${runId} for details.`,
-          display: true,
-          details: { results, sharedMemoryPath: memoryPath, plan: [] } satisfies TeamDetails,
-        },
-        { deliverAs: "followUp", triggerTurn: true },
-      );
-    })
-    .catch((err) => {
-      run.status = "failed";
-      run.error = String(err);
-      pi.sendMessage(
-        {
-          customType: "team-result",
-          content: `Team #${runId} failed: ${err}`,
-          display: true,
-        },
-        { deliverAs: "followUp", triggerTurn: true },
-      );
-    });
+  fs.writeFileSync(memoryFile, lines.join("\n"), "utf-8");
 }
 
-// ─── Tool Parameter Schema ──────────────────────────────────────────────────
+function readMemoryStatus(cwd: string): string {
+  const memoryFile = path.join(cwd, MEMORY_PATH);
+  if (!fs.existsSync(memoryFile)) return "No team memory found. Use /team-start first.";
 
-const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
-  description: 'Which profile directories to use. Default: "user". Use "both" to include project profiles.',
-  default: "user",
-});
+  const content = fs.readFileSync(memoryFile, "utf-8");
+  const lines = content.split("\n");
 
-const TeamParams = Type.Object({
-  task: Type.String({
-    description:
-      "The task for the team. Be specific. E.g. 'Implement OAuth login' or 'Analyze the auth module'",
-  }),
-  roles: Type.Optional(
-    Type.Array(Type.String(), {
-      description: "Which roles to involve. Omit to run all in reportsTo order. E.g. ['po', 'dev']",
-    }),
-  ),
-  model: Type.Optional(
-    Type.String({
-      description: "Override the model for ALL agents. E.g. 'deepseek-v4-flash'",
-    }),
-  ),
-  agentScope: Type.Optional(AgentScopeSchema),
-  confirmProjectProfiles: Type.Optional(
-    Type.Boolean({
-      description: "Prompt before running project profiles. Default: true.",
-      default: true,
-    }),
-  ),
-  teamReview: Type.Optional(
-    Type.Boolean({
-      description: "Run a review phase after execution. Default: false.",
-      default: false,
-    }),
-  ),
-});
+  // Extract DoD items and check status
+  const dodItems: string[] = [];
+  let inDoD = false;
+
+  for (const line of lines) {
+    if (line.trim() === "## DoD") {
+      inDoD = true;
+      continue;
+    }
+    if (inDoD && line.startsWith("- [")) {
+      dodItems.push(line.trim());
+    }
+    if (inDoD && line.trim() === "---") break;
+  }
+
+  const done = dodItems.filter((l) => l.startsWith("- [x]")).length;
+  const total = dodItems.length;
+
+  return [
+    `Team Progress: ${done}/${total} phases complete`,
+    "",
+    ...dodItems,
+  ].join("\n");
+}
 
 // ─── Extension ──────────────────────────────────────────────────────────────
 
@@ -192,7 +132,7 @@ export default function (pi: ExtensionAPI) {
   // ── /team-start <file.md> ─────────────────────────────────────────────
 
   pi.registerCommand("team-start", {
-    description: "Start a team from a task file. Usage: /team-start path/to/task.md",
+    description: "Initialize team memory from a task file and show the sprint chain command.",
     handler: async (args, ctx) => {
       const filePath = args.trim();
       if (!filePath) {
@@ -209,275 +149,106 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
+      // Load sprint
+      const sprint = loadSprint(ctx.cwd);
+      if (!sprint || sprint.phases.length === 0) {
+        ctx.ui.notify(
+          `No sprint.json found. Looked in: ${SPRINT_PATHS.join(", ")}`,
+          "error",
+        );
+        return;
+      }
+
+      // Parse task file
+      let content: string;
       try {
-        const content = fs.readFileSync(resolved, "utf-8");
-        const { frontmatter, body } = parseTaskFile(content);
-        const task = body.trim();
-
-        if (!task) {
-          ctx.ui.notify("Task file is empty.", "error");
-          return;
-        }
-
-        const agentScope: AgentScope =
-          (frontmatter.agentScope as AgentScope) ?? "user";
-        const roles = frontmatter.roles
-          ? frontmatter.roles.split(",").map((r) => r.trim()).filter(Boolean)
-          : undefined;
-        const model = frontmatter.model || undefined;
-        const teamReview = frontmatter.teamReview === "true";
-
-        await startTeam(ctx, pi, task, agentScope, roles, model, teamReview);
+        content = fs.readFileSync(resolved, "utf-8");
       } catch (err: any) {
         ctx.ui.notify(`Failed to read task file: ${err.message}`, "error");
+        return;
       }
+
+      const { frontmatter, body } = parseTaskFile(content);
+      const task = body.trim();
+      if (!task) {
+        ctx.ui.notify("Task file is empty.", "error");
+        return;
+      }
+
+      // Filter phases by roles if specified
+      let phases = sprint.phases;
+      if (frontmatter.roles) {
+        const roleSet = new Set(frontmatter.roles.split(",").map((r) => r.trim()));
+        phases = phases.filter((p) => roleSet.has(p.role));
+        if (phases.length === 0) {
+          ctx.ui.notify(`None of the requested roles match sprint phases. Available: ${sprint.phases.map(p => p.role).join(", ")}`, "error");
+          return;
+        }
+      }
+
+      // Write team memory
+      writeMemory(ctx.cwd, task, phases);
+
+      // Build chain steps for the LLM
+      const targetCwd = frontmatter.cwd || undefined;
+      const phaseList = phases.map((p) => `  ${p.role}: ${p.title}`).join("\n");
+      const chainSteps = phases.map((p, i) => {
+        const phaseTask = i === 0
+          ? `Read .pi/team/team-memory.md. Complete: ${p.title}. Append output.`
+          : `Read .pi/team/team-memory.md and complete ${p.title}. Append output.`;
+        const cwdPart = targetCwd ? `, cwd: "${targetCwd}"` : "";
+        return `{ agent: "${p.role}", task: "${phaseTask}"${cwdPart} }`;
+      }).join(",\n");
+
+      // Trigger LLM to run the chain via subagent tool
+      const prompt = [
+        `Run the team sprint chain for this task using the subagent tool: ${task}`,
+        ``,
+        `Chain steps (${phases.length} phases):`,
+        phaseList,
+        targetCwd ? `Working directory: ${targetCwd}` : "",
+        ``,
+        `Use subagent with chain mode: subagent({ chain: [`,
+        chainSteps,
+        `] })`,
+        ``,
+        `Each agent reads/writes .pi/team/team-memory.md. Run all steps sequentially.`,
+      ].filter(Boolean).join("\n");
+
+      ctx.ui.notify(
+        `Team memory initialized: ${MEMORY_PATH}\n\nPhases (${phases.length}):\n${phaseList}\n\nSprint chain starting via subagent tool...`,
+        "info",
+      );
+
+      // Send as user message to trigger the LLM turn
+      pi.sendUserMessage(prompt);
     },
   });
 
   // ── /team-status ──────────────────────────────────────────────────────
 
   pi.registerCommand("team-status", {
-    description: "Show running and completed team runs",
+    description: "Show team memory status and phase progress.",
     handler: async (_args, ctx) => {
-      if (teamRuns.size === 0) {
-        ctx.ui.notify("No team runs yet. Use /team-start or the team tool.", "info");
-        return;
-      }
-
-      const lines: string[] = [];
-      const sorted = [...teamRuns.values()].sort((a, b) => b.id - a.id);
-
-      for (const run of sorted) {
-        const icon = run.status === "running" ? "..." : run.status === "done" ? "OK" : "FAIL";
-        const taskPreview = truncate(run.task, 60);
-        const doneCount = run.results?.filter((r) => r.exitCode === 0).length ?? 0;
-        const totalCount = run.results?.length ?? "?";
-
-        lines.push(
-          `${icon} #${run.id} [${run.status}] ${doneCount}/${totalCount} agents - ${taskPreview}`,
-        );
-
-        if (run.results) {
-          const ri: Record<string, string> = { success: "OK", error: "FAIL", warning: "WARN" };
-          for (const r of run.results) {
-            const preview = truncate(r.finalOutput || r.errorMessage || "(no output)", 50);
-            lines.push(`    ${ri[statusIcon(r)]} ${r.role}: ${preview}`);
-          }
-          const total = aggregateUsage(run.results.map((r) => r.usage));
-          if (total.turns > 0) lines.push(`    ∑ ${formatUsageStats(total)}`);
-        } else if (run.status === "running" && run.progress.size > 0) {
-          // Show live progress for running agents
-          for (const [role, prog] of run.progress) {
-            const progStr = formatProgress(prog);
-            lines.push(`    ... ${role}: ${progStr}`);
-          }
-        }
-
-        if (run.memoryPath) lines.push(`    Memory: ${run.memoryPath}`);
-      }
-
-      ctx.ui.notify(lines.join("\n"), "info");
+      const status = readMemoryStatus(ctx.cwd);
+      ctx.ui.notify(status, "info");
     },
   });
 
-  // ── /team-result <id> ─────────────────────────────────────────────────
+  // ── /team-result ──────────────────────────────────────────────────────
 
   pi.registerCommand("team-result", {
-    description: "Show full result of a team run. Usage: /team-result <id>",
-    handler: async (args, ctx) => {
-      const id = parseInt(args.trim(), 10);
-      if (!id || !teamRuns.has(id)) {
-        ctx.ui.notify(`Team #${args.trim()} not found. Use /team-status.`, "error");
+    description: "Open team memory in the editor for inspection.",
+    handler: async (_args, ctx) => {
+      const memoryFile = path.join(ctx.cwd, MEMORY_PATH);
+      if (!fs.existsSync(memoryFile)) {
+        ctx.ui.notify("No team memory found. Use /team-start first.", "error");
         return;
       }
 
-      const run = teamRuns.get(id)!;
-      if (run.status === "running") {
-        ctx.ui.notify(`Team #${id} is still running...`, "warning");
-        return;
-      }
-
-      ctx.ui.setEditorText(buildTeamResultText(run));
-      ctx.ui.notify(`Team #${id} loaded into editor.`, "info");
+      const content = fs.readFileSync(memoryFile, "utf-8");
+      ctx.ui.setEditorText(content);
+      ctx.ui.notify(`Team memory loaded into editor (${memoryFile}).`, "info");
     },
   });
-
-  // ── Tool Registration ─────────────────────────────────────────────────
-
-  pi.registerTool({
-    name: "team",
-    label: "Team",
-    description: [
-      "Orchestrate a team of AI agents with role-based profiles.",
-      "Teams run in BACKGROUND (non-blocking). Check /team-status for progress.",
-      "Use /team-start <file.md> to start from a task file.",
-      'Profiles: ~/.pi/agent/team/profiles/*.md (user) or .pi/team/profiles/*.md (project).',
-      "Results are injected as follow-up messages when complete.",
-    ].join(" "),
-    promptSnippet: "Delegate work to a team of role-based agents (runs in background)",
-    promptGuidelines: [
-      "Use the team tool when the task benefits from multiple perspectives.",
-      "The team runs in background. Use /team-status to check progress.",
-      "Use /team-start path/to/task.md for task files with frontmatter.",
-      "Set teamReview: true to have root profiles review all outputs.",
-      "The team writes to .pi/team/team-memory.md – read it for agent outputs.",
-    ],
-    parameters: TeamParams,
-
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const task = params.task;
-      const agentScope: AgentScope = params.agentScope ?? "user";
-      const roles: string[] | undefined = params.roles;
-      const model: string | undefined = params.model;
-      const teamReview = params.teamReview ?? false;
-
-      // Profile discovery
-      const discovery = discoverProfiles(ctx.cwd, agentScope);
-
-      if (discovery.profiles.length === 0) {
-        const scopeInfo =
-          agentScope === "user"
-            ? "~/.pi/agent/team/profiles/"
-            : agentScope === "both"
-              ? "~/.pi/agent/team/profiles/ or .pi/team/profiles/"
-              : ".pi/team/profiles/";
-        return {
-          content: [
-            {
-              type: "text",
-              text: `No profiles found in ${scopeInfo}\n\nCreate a profile:\n\`\`\`markdown\n---\nrole: po\ndisplayName: Product Owner\nreportsTo: null\nmodel: deepseek-v4-pro\ntools: read, grep, find, ls\nmaxTurns: 0\n---\n\nSystem prompt...\n\`\`\``,
-            },
-          ],
-          details: { results: [], sharedMemoryPath: null, plan: [] } satisfies TeamDetails,
-        };
-      }
-
-      // Validate roles
-      if (roles && roles.length > 0) {
-        const profileRoles = new Set(discovery.profiles.map((p) => p.role));
-        const unknown = roles.filter((r) => !profileRoles.has(r));
-        if (unknown.length > 0) {
-          const available = discovery.profiles.map((p) => `${p.role} (${p.displayName})`).join(", ");
-          return {
-            content: [{ type: "text", text: `Unknown roles: ${unknown.join(", ")}.\nAvailable: ${available}` }],
-            details: { results: [], sharedMemoryPath: null, plan: [] } satisfies TeamDetails,
-          };
-        }
-      }
-
-      // Confirm project profiles
-      const confirmProject = params.confirmProjectProfiles ?? true;
-      if ((agentScope === "project" || agentScope === "both") && confirmProject && ctx.hasUI) {
-        const projectProfiles = discovery.profiles.filter((p) => p.source === "project");
-        if (projectProfiles.length > 0) {
-          const names = projectProfiles.map((p) => `${p.displayName} (${p.role})`).join(", ");
-          const ok = await ctx.ui.confirm("Run project-local team profiles?", `Profiles: ${names}`);
-          if (!ok) {
-            return {
-              content: [{ type: "text", text: "Canceled: project profiles not approved." }],
-              details: { results: [], sharedMemoryPath: null, plan: [] } satisfies TeamDetails,
-            };
-          }
-        }
-      }
-
-      // Plan
-      const planDescription = describePlan(
-        buildPlanForDisplay(discovery.profiles, task, roles),
-        discovery.profiles,
-      );
-
-      // Create run
-      const runId = nextTeamId++;
-      const run: TeamRun = { id: runId, task, status: "running", startedAt: new Date().toISOString(), progress: new Map() };
-      teamRuns.set(runId, run);
-
-      // Start background execution
-      const cwd = ctx.cwd;
-      executeTeam(discovery.profiles, task, cwd, roles, model, undefined, teamReview, (role, progress) => {
-          run.progress.set(role, progress);
-        })
-        .then(({ results, memoryPath }) => {
-          run.status = results.every((r) => r.exitCode === 0) ? "done" : "failed";
-          run.results = results;
-          run.memoryPath = memoryPath;
-
-          const doneCount = results.filter((r) => r.exitCode === 0).length;
-          pi.sendMessage(
-            {
-              customType: "team-result",
-              content: `Team #${runId} done: ${doneCount}/${results.length} agents. /team-result ${runId}`,
-              display: true,
-              details: { results, sharedMemoryPath: memoryPath, plan: [] } satisfies TeamDetails,
-            },
-            { deliverAs: "followUp", triggerTurn: true },
-          );
-        })
-        .catch((err) => {
-          run.status = "failed";
-          run.error = String(err);
-          pi.sendMessage(
-            { customType: "team-result", content: `Team #${runId} failed: ${err}`, display: true },
-            { deliverAs: "followUp", triggerTurn: true },
-          );
-        });
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Team #${runId} started in background.\nPlan: ${planDescription}\nCheck /team-status for progress.`,
-          },
-        ],
-        details: { results: [], sharedMemoryPath: null, plan: [] } satisfies TeamDetails,
-      };
-    },
-
-    renderCall: renderTeamCall,
-    renderResult: renderTeamResult,
-  });
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function buildPlanForDisplay(
-  profiles: readonly import("./types").ProfileConfig[],
-  task: string,
-  roles?: readonly string[],
-): import("./types").Task[] {
-  try {
-    return buildExecutionPlan(profiles, task, roles);
-  } catch {
-    return [];
-  }
-}
-
-function buildTeamResultText(run: TeamRun): string {
-  const lines: string[] = [];
-  lines.push(`# Team #${run.id} - ${run.status.toUpperCase()}`);
-  lines.push(`Task: ${run.task}`);
-  lines.push(`Started: ${run.startedAt}`);
-  lines.push("");
-
-  if (run.error) {
-    lines.push(`Error: ${run.error}`);
-    return lines.join("\n");
-  }
-
-  if (run.results) {
-    for (const r of run.results) {
-      const icon = r.exitCode === 0 ? "OK" : "FAIL";
-      lines.push(`## ${icon} ${r.role}`);
-      lines.push("");
-      if (r.finalOutput) lines.push(r.finalOutput);
-      if (r.errorMessage) lines.push(`\nError: ${r.errorMessage}`);
-      if (r.usage.turns > 0) lines.push(`\nUsage: ${formatUsageStats(r.usage)}`);
-      lines.push("");
-    }
-
-    const total = aggregateUsage(run.results.map((r) => r.usage));
-    if (total.turns > 0) lines.push(`---\nTotal: ${formatUsageStats(total)}`);
-  }
-
-  return lines.join("\n");
 }
