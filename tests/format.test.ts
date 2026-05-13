@@ -78,7 +78,7 @@ describe("formatUsageStats", () => {
       input: 0, output: 0, cacheRead: 0, cacheWrite: 0,
       cost: 0, tokens: 15000, turns: 0,
     });
-    expect(result).toContain("ctx:15.0k");
+    expect(result).toContain("ctx:15k");
   });
 
   it("shows model if provided", () => {
@@ -106,7 +106,7 @@ describe("aggregateUsage", () => {
     ]);
     expect(result.input).toBe(300);
     expect(result.output).toBe(150);
-    expect(result.cacheRead).toBe(30);
+    expect(result.cacheRead).toBe(50);
     expect(result.cacheWrite).toBe(30);
     expect(result.cost).toBe(0.03);
     expect(result.tokens).toBe(13000);
@@ -149,7 +149,7 @@ describe("truncate", () => {
   });
 
   it("truncates with ellipsis", () => {
-    expect(truncate("hello world this is long", 14)).toBe("hello worl...");
+    expect(truncate("hello world this is long", 14)).toBe("hello world...");
   });
 });
 

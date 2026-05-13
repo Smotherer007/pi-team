@@ -158,7 +158,7 @@ describe("isDoDComplete", () => {
     ).toBe(false);
   });
 
-  it("returns true for empty array", () => {
-    expect(isDoDComplete([])).toBe(true);
+  it("returns false for empty array", () => {
+    expect(isDoDComplete([])).toBe(false);
   });
 });

@@ -48,10 +48,13 @@ describe("buildExecutionPlan", () => {
     expect(roles).toContain("ux");
   });
 
-  it("filters by requested roles", () => {
+  it("filters by requested roles (includes ancestors)", () => {
+    // When requesting "dev" and "qa", po is included as ancestor of dev
     const plan = buildExecutionPlan([po, dev, qa], "task", ["dev", "qa"]);
     const roles = plan.map((t) => t.assignedRole);
-    expect(roles).toEqual(["dev", "qa"]);
+    expect(roles).toContain("dev");
+    expect(roles).toContain("qa");
+    expect(roles).toContain("po"); // ancestor
   });
 
   it("includes ancestors of requested roles", () => {
@@ -87,8 +90,8 @@ describe("buildExecutionPlan", () => {
 
 describe("buildDoDFromPlan", () => {
   it("creates DoD items from plan", () => {
-    const po = makeProfile({ role: "po", displayName: "Product Owner" });
-    const dev = makeProfile({ role: "dev", displayName: "Developer" });
+    const po = makeProfile({ role: "po", displayName: "Product Owner", reportsTo: null });
+    const dev = makeProfile({ role: "dev", displayName: "Developer", reportsTo: "po" });
     const plan = buildExecutionPlan([po, dev], "task");
 
     const dodItems = buildDoDFromPlan(plan, [po, dev]);

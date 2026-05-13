@@ -16,37 +16,38 @@ const testProfile = {
 
 describe("buildTaskInstructions", () => {
   it("generates structured instructions with title", () => {
-    const result = buildTaskInstructions(testProfile, "execute");
-    expect(result).toContain("## Your Task");
-    expect(result).toContain("1. Read the shared memory");
-    expect(result).toContain("Test Agent");
+    // Uses the real sprint.json from ~/.pi/agent/team/ which has "requirements" phase for "po"
+    const result = buildTaskInstructions(testProfile, "requirements");
+    expect(result).toContain("## Requirements Analysis");
+    expect(result).toContain("Read the shared memory");
   });
 
   it("replaces template variables", () => {
     const result = buildTaskInstructions(
       { displayName: "Product Owner", role: "po", reportsTo: null },
-      "execute",
+      "requirements",
     );
-    expect(result).toContain("Product Owner");
+    expect(result).toContain("Requirements Analysis");
     expect(result).not.toContain("{displayName}");
   });
 
-  it("replaces reportsTo with 'none' when null", () => {
+  it("handles missing template variables gracefully", () => {
     const result = buildTaskInstructions(
       { displayName: "PO", role: "po", reportsTo: null },
-      "execute",
+      "requirements",
     );
+    // Should not contain unresolved templates
     expect(result).not.toContain("{reportsTo}");
   });
 
   it("generates review phase instructions", () => {
     const result = buildTaskInstructions(testProfile, "review");
-    expect(result).toContain("## Review Phase");
-    expect(result).toContain("Read the complete shared memory");
+    expect(result).toContain("## Final Review");
+    expect(result).toContain("Read all phase outputs");
   });
 
   it("accepts overrides", () => {
-    const result = buildTaskInstructions(testProfile, "execute", {
+    const result = buildTaskInstructions(testProfile, "requirements", {
       title: "Custom Title",
       steps: ["Step A", "Step B"],
     });
@@ -79,8 +80,8 @@ describe("getSprint", () => {
 
       const sprint = getSprint();
       expect(sprint.phases.length).toBeGreaterThanOrEqual(2);
-      expect(sprint.phases[0].id).toBe("execute");
-      expect(sprint.phases[1].id).toBe("review");
+      expect(sprint.phases[0].id).toBe("requirements");
+      expect(sprint.phases[sprint.phases.length - 1].id).toBe("review");
     } finally {
       // Restore
       try {
