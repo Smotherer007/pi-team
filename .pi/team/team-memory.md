@@ -462,7 +462,7 @@ Key design decisions:
 
 ### Commit Hash
 
-Commit: _(pending - run `git add` and `git commit` with the commit message below)_
+Commit: 6edec7529f69a6e035bf23780419957dff21b95e
 
 ### PO Review Checklist
 
