@@ -17,7 +17,6 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { DoDItem, MemorySection, SharedMemory } from "./types";
 
 // ─── Section Markers ────────────────────────────────────────────────────────
@@ -249,6 +248,6 @@ function parseMemoryContent(raw: string): SharedMemory {
 
 // ─── Path Helper ────────────────────────────────────────────────────────────
 
-function getMemoryPath(_cwd: string): string {
-  return path.join(getAgentDir(), "team", "team-memory.md");
+function getMemoryPath(cwd: string): string {
+  return path.join(cwd, ".pi", "team", "team-memory.md");
 }
