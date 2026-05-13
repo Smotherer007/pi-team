@@ -128,12 +128,19 @@ export function buildTaskInstructions(
   const sprint = getSprint();
   const phase = sprint.phases.find((p) => p.id === phaseId);
 
-  if (!phase) {
-    // Fallback: find by role wildcard
-    const fallback = sprint.phases.find((p) => p.role === "*");
-    if (!fallback) return "## Task\nExecute your task.";
-    return buildFromPhase(fallback, profile, overrides);
+  // Phase not in custom sprint? Check default sprint
+  const defaultPhase = DEFAULT_SPRINT.phases.find((p) => p.id === phaseId);
+  if (defaultPhase) {
+    return buildFromPhase(defaultPhase, profile, overrides);
   }
+
+  // Last resort: find any wildcard phase
+  const wildcard = sprint.phases.find((p) => p.role === "*");
+  if (wildcard) {
+    return buildFromPhase(wildcard, profile, overrides);
+  }
+
+  return "## Task\nExecute your task.";
 
   return buildFromPhase(phase, profile, overrides);
 }

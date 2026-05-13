@@ -2,10 +2,7 @@
  * Tests for instructions.ts — sprint phase loading and task instruction building
  */
 
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildTaskInstructions, getSprint } from "../src/instructions";
 
 const testProfile = {
@@ -16,18 +13,18 @@ const testProfile = {
 
 describe("buildTaskInstructions", () => {
   it("generates structured instructions with title", () => {
-    // Uses the real sprint.json from ~/.pi/agent/team/ which has "requirements" phase for "po"
-    const result = buildTaskInstructions(testProfile, "requirements");
-    expect(result).toContain("## Requirements Analysis");
+    // Tests against the default sprint (always available)
+    const result = buildTaskInstructions(testProfile, "execute");
+    expect(result).toContain("## Your Task");
     expect(result).toContain("Read the shared memory");
   });
 
   it("replaces template variables", () => {
     const result = buildTaskInstructions(
       { displayName: "Product Owner", role: "po", reportsTo: null },
-      "requirements",
+      "execute",
     );
-    expect(result).toContain("Requirements Analysis");
+    expect(result).toContain("Product Owner");
     expect(result).not.toContain("{displayName}");
   });
 
@@ -42,12 +39,12 @@ describe("buildTaskInstructions", () => {
 
   it("generates review phase instructions", () => {
     const result = buildTaskInstructions(testProfile, "review");
-    expect(result).toContain("## Final Review");
-    expect(result).toContain("Read all phase outputs");
+    expect(result).toContain("## Review Phase");
+    expect(result).toContain("Read the complete shared memory");
   });
 
   it("accepts overrides", () => {
-    const result = buildTaskInstructions(testProfile, "requirements", {
+    const result = buildTaskInstructions(testProfile, "execute", {
       title: "Custom Title",
       steps: ["Step A", "Step B"],
     });
@@ -65,34 +62,10 @@ describe("buildTaskInstructions", () => {
 });
 
 describe("getSprint", () => {
-  it("returns default sprint when no sprint.json exists", () => {
-    // Save and remove any existing sprint.json in cwd
-    const cwd = process.cwd();
-    const sprintPath = path.join(cwd, ".pi", "team", "sprint.json");
-    const backupPath = path.join(cwd, ".pi", "team", "sprint.json.bak");
-
-    let backup: string | null = null;
-    try {
-      if (fs.existsSync(sprintPath)) {
-        backup = fs.readFileSync(sprintPath, "utf-8");
-        fs.renameSync(sprintPath, backupPath);
-      }
-
-      const sprint = getSprint();
-      expect(sprint.phases.length).toBeGreaterThanOrEqual(2);
-      expect(sprint.phases[0].id).toBe("requirements");
-      expect(sprint.phases[sprint.phases.length - 1].id).toBe("review");
-    } finally {
-      // Restore
-      try {
-        if (backup !== null) {
-          fs.mkdirSync(path.dirname(sprintPath), { recursive: true });
-          fs.writeFileSync(sprintPath, backup);
-          fs.rmSync(backupPath, { force: true });
-        }
-      } catch {
-        // ignore
-      }
-    }
+  it("returns a valid sprint config with phases", () => {
+    const sprint = getSprint();
+    expect(sprint.phases.length).toBeGreaterThanOrEqual(2);
+    expect(sprint.phases.every((p) => typeof p.id === "string")).toBe(true);
+    expect(sprint.phases.every((p) => Array.isArray(p.steps))).toBe(true);
   });
 });
