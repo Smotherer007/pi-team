@@ -13,12 +13,19 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const MEMORY_PATH = ".pi/team/team-memory.md";
-const SPRINT_PATHS = [".pi/team/sprint.json", "sprint.json"];
+
+// Lookup order: project-local .pi/team/ first, then project root, then the
+// pi-team package's own bundled sprint.json as fallback.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PACKAGE_SPRINT = path.join(__dirname, "..", "sprint.json");
+const SPRINT_PATHS = [".pi/team/sprint.json", "sprint.json", PACKAGE_SPRINT];
 
 // ─── Sprint Phase ───────────────────────────────────────────────────────────
 
@@ -34,17 +41,40 @@ type Sprint = {
   phases: SprintPhase[];
 };
 
-function loadSprint(cwd: string): Sprint | null {
+type LoadSprintResult = {
+  sprint: Sprint;
+  sourcePath: string;
+};
+
+function loadSprint(cwd: string): LoadSprintResult | null {
   for (const relPath of SPRINT_PATHS) {
-    const sprintFile = path.join(cwd, relPath);
+    // PACKAGE_SPRINT is absolute; don't join with cwd.
+    const sprintFile = path.isAbsolute(relPath) ? relPath : path.join(cwd, relPath);
     if (!fs.existsSync(sprintFile)) continue;
     try {
-      return JSON.parse(fs.readFileSync(sprintFile, "utf-8")) as Sprint;
+      return {
+        sprint: JSON.parse(fs.readFileSync(sprintFile, "utf-8")) as Sprint,
+        sourcePath: sprintFile,
+      };
     } catch {
       continue;
     }
   }
   return null;
+}
+
+/**
+ * If sprint was loaded from the package fallback, seed a project-local copy
+ * in .pi/team/sprint.json so the user can customise it.
+ */
+function ensureLocalSprint(cwd: string, result: LoadSprintResult): void {
+  const localPath = path.join(cwd, ".pi/team/sprint.json");
+  if (fs.existsSync(localPath)) return; // already exists, don't overwrite
+
+  const dir = path.dirname(localPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  fs.writeFileSync(localPath, JSON.stringify(result.sprint, null, 2), "utf-8");
 }
 
 // ─── Task File Parser ──────────────────────────────────────────────────────
@@ -149,14 +179,24 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Load sprint
-      const sprint = loadSprint(ctx.cwd);
-      if (!sprint || sprint.phases.length === 0) {
+      // Load sprint (searches project-local paths first, then package fallback)
+      const loadResult = loadSprint(ctx.cwd);
+      if (!loadResult || loadResult.sprint.phases.length === 0) {
         ctx.ui.notify(
           `No sprint.json found. Looked in: ${SPRINT_PATHS.join(", ")}`,
           "error",
         );
         return;
+      }
+      const sprint = loadResult.sprint;
+
+      // Seed a local copy in .pi/team/ if it doesn't exist yet
+      ensureLocalSprint(ctx.cwd, loadResult);
+      if (!fs.existsSync(path.join(ctx.cwd, ".pi/team/sprint.json"))) {
+        ctx.ui.notify(
+          `Created .pi/team/sprint.json from ${loadResult.sourcePath} — you can customise it now.`,
+          "info",
+        );
       }
 
       // Parse task file
